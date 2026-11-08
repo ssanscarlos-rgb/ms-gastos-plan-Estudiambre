@@ -1,0 +1,9 @@
+target/
+.idea/
+*.iml
+.vscode/
+.env
+*.pfx
+*.pem
+*.key
+.DS_Store
