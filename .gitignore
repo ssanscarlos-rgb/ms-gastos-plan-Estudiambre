@@ -7,3 +7,4 @@ target/
 *.pem
 *.key
 .DS_Store
+local.properties
