@@ -1,0 +1,413 @@
+{
+  "info": {
+    "_postman_id": "531b8e68-bc8b-48f3-8311-c329e7ce9d64",
+    "name": "ms-gastos-plan (EstudiAmbre)",
+    "description": "Pruebas de ms-gastos-plan por APIM. Antes de correr: poner en la variable 'token' un token de Google vigente (dura 1 hora). Correr en orden con el Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. PATCH plan (meta y categorias)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/plan",
+        "description": "Reemplaza el arreglo completo de categorias. 'gastado' lo calcula el servidor; si se envia, se ignora.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"meta\": 500,\n  \"categorias\": [\n    {\n      \"nombre\": \"Comida\",\n      \"presupuesto\": 100\n    },\n    {\n      \"nombre\": \"Transporte\",\n      \"presupuesto\": 50\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Devuelve categorias con gastado\", () => pm.expect(pm.response.json().categorias[0]).to.have.property(\"gastado\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. GET plan",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/plan",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. POST gasto (crear)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/gastos",
+        "description": "Guarda el id en la variable gastoId para las siguientes pruebas.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"descripcion\": \"Almuerzo\",\n  \"monto\": 70,\n  \"categoria\": \"Comida\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+              "const j = pm.response.json();",
+              "pm.collectionVariables.set(\"gastoId\", j.id);",
+              "pm.test(\"Fecha en epoch ms\", () => pm.expect(j.fecha).to.be.above(1e11));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. POST gasto que cruza el 80% (evento a la cola)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/gastos",
+        "description": "Comida queda en 85%: el servicio publica PRESUPUESTO_80 en la cola eventos-presupuesto.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"descripcion\": \"Cena\",\n  \"monto\": 15,\n  \"categoria\": \"Comida\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. GET gastos (paginado)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/gastos?page=0&size=10",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Formato paginado\", () => {",
+              "  const j = pm.response.json();",
+              "  [\"content\",\"page\",\"size\",\"totalElements\",\"totalPages\"].forEach(k => pm.expect(j).to.have.property(k));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. GET gastos con busqueda q",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/gastos?page=0&size=10&q=almu",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Formato paginado\", () => {",
+              "  const j = pm.response.json();",
+              "  [\"content\",\"page\",\"size\",\"totalElements\",\"totalPages\"].forEach(k => pm.expect(j).to.have.property(k));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. PATCH gasto (solo monto)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/gastos/{{gastoId}}",
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"monto\": 60\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Cambio el monto y no la descripcion\", () => {",
+              "  const j = pm.response.json();",
+              "  pm.expect(j.monto).to.eql(60);",
+              "  pm.expect(j.descripcion).to.eql(\"Almuerzo\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. GET resumen",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/resumen",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Campos del resumen\", () => {",
+              "  const j = pm.response.json();",
+              "  [\"disponible\",\"gastado\",\"meta\",\"mensaje\",\"ultimosMovimientos\"].forEach(k => pm.expect(j).to.have.property(k));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. DELETE gasto",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/gastos/{{gastoId}}",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Error: monto negativo (400 con correlationId)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/gastos",
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"descripcion\": \"Malo\",\n  \"monto\": -5,\n  \"categoria\": \"Comida\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Error con status, message y correlationId\", () => {",
+              "  const j = pm.response.json();",
+              "  [\"status\",\"message\",\"correlationId\"].forEach(k => pm.expect(j).to.have.property(k));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Seguridad: sin token por APIM (401)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/gastos",
+        "description": "APIM rechaza con validate-jwt."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Seguridad: llamada directa sin certificado (403)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{directUrl}}/v1/gastos",
+        "description": "Directo al App Service sin certificado cliente: Azure responde 403 (Client Certificate Required)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://apimproyectoestudiambre.azure-api.net/gastos-plan/v1"
+    },
+    {
+      "key": "directUrl",
+      "value": "https://ms-estudiambre-gastos-plan-h8hgggcxd9btepdc.eastus-01.azurewebsites.net"
+    },
+    {
+      "key": "token",
+      "value": "PEGAR_TOKEN_DE_GOOGLE"
+    },
+    {
+      "key": "gastoId",
+      "value": ""
+    }
+  ]
+}
